@@ -1,16 +1,22 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
+using System.Reflection;
 using System.Text;
 using System.Web;
-
+using System.Collections;
 namespace BasicServerHTTPlistener
 {
     internal class Program
     {
+
         private static void Main(string[] args)
         {
+
+
+
 
             //if HttpListener is not supported by the Framework
             if (!HttpListener.IsSupported)
@@ -78,48 +84,119 @@ namespace BasicServerHTTPlistener
                 //get url protocol
                 Console.WriteLine(request.Url.Scheme);
                 //get user in url
-                Console.WriteLine(request.Url.UserInfo);
+                Console.WriteLine("user : " + request.Url.UserInfo);
                 //get host in url
-                Console.WriteLine(request.Url.Host);
+                Console.WriteLine("host :" + request.Url.Host);
                 //get port in url
                 Console.WriteLine(request.Url.Port);
                 //get path in url 
-                Console.WriteLine(request.Url.LocalPath);
+                Console.WriteLine("localpath :" + request.Url.LocalPath);
+
 
                 // parse path in url 
+                Console.WriteLine("Segments :");
                 foreach (string str in request.Url.Segments)
                 {
                     Console.WriteLine(str);
                 }
 
                 //get params un url. After ? and between &
+                
+                MyReflectionClass c = new MyReflectionClass();
+                
+                if (request.Url.Segments.Length==3 && c.GetType().GetMethod((string)request.Url.Segments[2]) !=null)
+                {
+                    Console.WriteLine("param1 = " + HttpUtility.ParseQueryString(request.Url.Query).Get("param1"));
+                    Console.WriteLine("param2 = " + HttpUtility.ParseQueryString(request.Url.Query).Get("param2"));
 
-                Console.WriteLine(request.Url.Query);
+                    ArrayList parameters = new ArrayList();
+                    parameters.Add(HttpUtility.ParseQueryString(request.Url.Query).Get("param1"));
+                    parameters.Add(HttpUtility.ParseQueryString(request.Url.Query).Get("param2"));
 
-                //parse params in url
-                Console.WriteLine("param1 = " + HttpUtility.ParseQueryString(request.Url.Query).Get("param1"));
-                Console.WriteLine("param2 = " + HttpUtility.ParseQueryString(request.Url.Query).Get("param2"));
-                Console.WriteLine("param3 = " + HttpUtility.ParseQueryString(request.Url.Query).Get("param3"));
-                Console.WriteLine("param4 = " + HttpUtility.ParseQueryString(request.Url.Query).Get("param4"));
+                    string methodName = request.Url.Segments[2];
 
-                //
-                Console.WriteLine(documentContents);
+                    Console.WriteLine("methode nom : " + methodName);
 
-                // Obtain a response object.
-                HttpListenerResponse response = context.Response;
+                    // Construct a response.
+                    Type type = typeof(MyReflectionClass);
+                    MethodInfo method = type.GetMethod(methodName);
+                    string result = "";
+                    if (methodName.Equals("MyMethod"))
+                    {
+                        result = (string)method.Invoke(c, parameters.ToArray());
+                    }
+                    else if (methodName.Equals("MyMethod2"))
+                    {
+                        result = (string)method.Invoke(c, parameters.ToArray());
+                    }
+                    else if (methodName.Equals("callExternalExe"))
+                    {
+                        result = (string)method.Invoke(c, new string[] { (string) parameters[0] });
+                    }
 
-                // Construct a response.
-                string responseString = "<HTML><BODY> Hello world!</BODY></HTML>";
-                byte[] buffer = System.Text.Encoding.UTF8.GetBytes(responseString);
-                // Get a response stream and write the response to it.
-                response.ContentLength64 = buffer.Length;
-                System.IO.Stream output = response.OutputStream;
-                output.Write(buffer, 0, buffer.Length);
-                // You must close the output stream.
-                output.Close();
+                    Console.WriteLine(documentContents);
+
+                    // Obtain a response object.
+                    HttpListenerResponse response = context.Response;
+
+                    byte[] buffer = System.Text.Encoding.UTF8.GetBytes(result);
+                    // Get a response stream and write the response to it.
+                    response.ContentLength64 = buffer.Length;
+                    System.IO.Stream output = response.OutputStream;
+                    output.Write(buffer, 0, buffer.Length);
+                    // You must close the output stream.
+                    output.Close();
+                    
+                    
+
+
+                }
             }
             // Httplistener neither stop ... But Ctrl-C do that ...
-            // listener.Stop();
+            listener.Stop();
+        }
+    }
+
+    public class MyReflectionClass
+    {
+        // http://localhost:8080/foo/MyMethod?param1=oui&param2=non
+        public string MyMethod(string param1, string param2)
+        {
+            Console.WriteLine("Call MyMethod");
+            return "<HTML><BODY>Hello " + param1 + " " +  param2 + "</HTML></BODY>";
+        }
+        // http://localhost:8080/foo/MyMethod2?param1=oui&param2=non
+        public string MyMethod2(string param1, string param2)
+        {
+            Console.WriteLine("Call MyMethod");
+            return "<HTML><BODY>Hello2222 " + param1 + " " + param2 + "</HTML></BODY>";
+        }
+        // http://localhost:8080/foo/callExternalExe?param1=oui
+        public string callExternalExe(string param1)
+        {
+            ProcessStartInfo start = new ProcessStartInfo();
+            start.FileName = @"D:\4A\S8\SOC\RepoTD\TD2\ExecTest\bin\Debug\ExecTest.exe"; // Specify exe name.
+            start.Arguments = param1; // Specify arguments.
+            start.UseShellExecute = false;
+            start.RedirectStandardOutput = true;
+
+            //
+            // Start the process.
+            //
+            using (Process process = Process.Start(start))
+            {
+                //
+                // Read in all the text from the process with the StreamReader.
+                //
+                using (StreamReader reader = process.StandardOutput)
+                {
+                    string result = reader.ReadToEnd();
+                    Console.WriteLine(result);
+                    return "<HTML><BODY>L'éxécutable s'est lancé avec comme param : " + result + "</HTML></BODY>";
+                }
+            }
+            
+
         }
     }
 }
